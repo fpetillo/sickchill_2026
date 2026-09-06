@@ -1,33 +1,29 @@
 # TV Manager v12 Parity Matrix
 
-This matrix is the acceptance checklist for replacing the legacy runtime. A capability is not considered complete until behavior, migration, diagnostics, and regression coverage are all proven.
+This matrix tracks functional replacement readiness. A capability is not considered complete merely because a screen or endpoint exists; migration fidelity, failure handling, diagnostics, tests, and rollback impact are part of parity.
 
-| Area | Legacy capability | v12 target | Status |
+| Capability | Legacy baseline | v12 state | Acceptance requirement |
 | --- | --- | --- | --- |
-| Library | Existing-show import | Safe scan/import with duplicate detection and preview | Planned |
-| Library | Show/season/episode monitoring | Explicit typed monitoring states with bulk operations | Foundation |
-| Library | Anime/sports/air-by-date/scene | Preserve and expose all legacy flags | Migration mapping planned |
-| Library | Root directories | Validated root folders, path moves, permissions diagnostics | Planned |
-| Metadata | TV indexers and IDs | Adapter model with source provenance and health | Planned |
-| Metadata | Artwork/NFO | Regeneration, provenance, repair workflows | Planned |
-| Search | Scheduled recent/backlog | Observable jobs with explainable decisions | Planned |
-| Search | Manual search | Interactive ranked candidate view | Planned |
-| Search | Newznab/Torznab/native providers | Typed adapters with capability and health checks | Planned |
-| Search | Required/rejected words | Deterministic scoring and rejection explanation | Foundation |
-| Search | Quality profiles | Typed allowed/preferred/cutoff representation | Foundation |
-| Search | Failed downloads | Persistent suppression/retry policy | Planned |
-| Download | NZB/torrent clients | Typed adapters, queue state, test connection | Planned |
-| Processing | Rename/move/copy/hardlink | Idempotent operation plan and journal | Planned |
-| Processing | Multi-episode/specials | Preserve legacy behavior with regression fixtures | Planned |
-| Subtitles | Automatic matching/download | Provider adapter + language/forced preferences | Planned |
-| Notifications | Existing notifiers | Capability-based notification adapters | Planned |
-| Calendar | Upcoming schedule | API-first calendar/feed and responsive UI | Planned |
-| History | Search/download/process history | Unified event stream with filters | Planned |
-| Diagnostics | Logs and provider tests | Health dashboard and structured diagnostics | Planned |
-| Migration | Existing database/config | Read-only snapshot + validation + rollback | Foundation |
-| Deployment | Native/Docker | Reproducible deployment, health/readiness checks | Planned |
-| UI | Legacy web interface | Responsive, accessible, configuration-clear interface | Planned |
+| Show / episode domain model | Available | Foundation implemented | Preserve identifiers, statuses, numbering modes, paths, and flags |
+| Quality profiles and release scoring | Available | Foundation implemented | Preserve legacy quality intent and add deterministic/explainable selection |
+| Required / rejected release words | Available | Implemented | Candidate decisions must explain matching rule outcomes |
+| Failed download handling | Available | Suppression primitive implemented | Persist failures, expire/safely release suppression, support manual retry |
+| Provider integrations | Available | Typed adapter contract implemented | Concrete providers, health, capabilities, rate limits, retry/backoff |
+| Downloader integrations | Available | Typed adapter contract implemented | Concrete clients, health, submit/delete, queue/history normalization |
+| Provider/downloader health diagnostics | Limited / log-oriented | Health model implemented | Dashboard-ready health, latency, recent errors, actionable remediation |
+| Library repository/service boundary | Legacy direct access | Contract + reference repository implemented | SQLite compatibility repository with transactional behavior and tests |
+| Wanted/missing queue calculation | Available | Service primitive implemented | Match legacy monitoring semantics including paused/ignored/special cases |
+| Search-decision explanations | Limited | Implemented as first-class model | Persist and expose reasons for accepted/rejected/suppressed candidates |
+| Search orchestration | Available | Planned | Provider fan-out, dedupe, ranking, timeout policy, diagnostics, manual search |
+| Queue/history | Available | Planned | Normalized multi-client queue/history, intervention, retry, failure recovery |
+| Post-processing | Available | Planned | Idempotent processing, rename/move/link, multi-episode, repair workflows |
+| Subtitle automation | Available | Planned | Match existing providers/preferences including forced/foreign-only behavior |
+| Metadata/artwork | Available | Planned | Source provenance, refresh, conflict handling, repair, filesystem safety |
+| Legacy DB/config migration | Available as existing state | Read-only exporter implemented | Complete mapping + validation report + dry run + backup + rollback |
+| Versioned service API | Limited legacy API | Planned | Library, episodes, search, queue, history, config, diagnostics |
+| Modern responsive UI | Legacy UI | Planned | Feature-complete API-driven workflows, mobile/desktop, accessibility |
+| Cutover / rollback | Manual | Planned | Automated backup, reversible cutover, reconciliation, parity regression |
 
-## Completion rule
+## Release gate
 
-A row moves to **Complete** only when its implementation is covered by tests, exposed through stable service boundaries, represented in migration validation when applicable, and documented for operators/users.
+v12 becomes eligible to replace the legacy runtime only after the matrix is substantially complete and automated parity checks cover migrated libraries, critical search/download workflows, post-processing, configuration, and rollback.
