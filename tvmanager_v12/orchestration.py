@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Iterable, Sequence
+from typing import Callable, Iterable, Sequence
 
 from .adapters import DownloadRequest, DownloaderAdapter, HealthState, ProviderAdapter, SearchRequest
 from .domain import DownloadCandidate, Episode, QualityProfile, Show
+from .queue import ActivityStore, QueueItem
 from .search import FailedDownloadSuppression, SearchDecision, choose_candidate
 
 
@@ -52,6 +53,8 @@ class SearchOrchestrator:
     downloader: DownloaderAdapter | None = None
     suppression: FailedDownloadSuppression = field(default_factory=FailedDownloadSuppression)
     journal: SearchJournal = field(default_factory=SearchJournal)
+    activity: ActivityStore | None = None
+    persistent_recorder: Callable[[SearchRun], object] | None = None
 
     def run(
         self,
@@ -75,14 +78,18 @@ class SearchOrchestrator:
         for provider in self.providers:
             health = provider.health()
             if health.state == HealthState.UNAVAILABLE:
-                provider_results.append(ProviderSearchResult(provider.name, error=health.message, skipped=True))
+                provider_results.append(
+                    ProviderSearchResult(provider.name, error=health.message, skipped=True)
+                )
                 continue
             try:
                 found = tuple(provider.search(request))
                 candidates.extend(found)
                 provider_results.append(ProviderSearchResult(provider.name, candidates=found))
             except Exception as exc:
-                provider_results.append(ProviderSearchResult(provider.name, error=str(exc)))
+                provider_results.append(
+                    ProviderSearchResult(provider.name, error=f"{type(exc).__name__}: {exc}")
+                )
 
         decision = choose_candidate(
             candidates,
@@ -101,10 +108,21 @@ class SearchOrchestrator:
             elif self.downloader.health().state == HealthState.UNAVAILABLE:
                 submission_message = "Downloader is unavailable."
             else:
-                result = self.downloader.submit(DownloadRequest(decision.chosen, category=category))
+                result = self.downloader.submit(
+                    DownloadRequest(decision.chosen, category=category)
+                )
                 submitted = result.accepted
                 submission_message = result.message
                 client_id = result.client_id
+                if submitted and client_id and self.activity is not None:
+                    self.activity.add(
+                        QueueItem(
+                            client_id=client_id,
+                            title=decision.chosen.title,
+                            downloader=self.downloader.name,
+                            message=result.message,
+                        )
+                    )
 
         run = SearchRun(
             started_at=started,
@@ -119,4 +137,6 @@ class SearchOrchestrator:
             client_id=client_id,
         )
         self.journal.append(run)
+        if self.persistent_recorder is not None:
+            self.persistent_recorder(run)
         return run
