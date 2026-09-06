@@ -28,6 +28,7 @@ This branch establishes the additive v12 modernization foundation without changi
 - Repository abstraction for shows plus an in-memory reference implementation.
 - Library service for show listing, wanted-episode calculation, episode state updates, and bulk upsert.
 - Regression coverage for adapter health, search explanations, failed-release expiry, and paused-show queue behavior.
+- Architecture, parity, release-note, and capability documentation updated to match the implementation.
 
 ## Next code milestones
 
