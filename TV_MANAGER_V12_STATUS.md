@@ -1,44 +1,36 @@
 # TV Manager v12 Status
 
-Current development version: **12.0.0-dev.2**
+Current development version: **12.0.0-dev.3**
 
-This branch establishes the additive v12 modernization foundation without changing the legacy SickChill runtime path.
+This branch remains additive to the legacy SickChill runtime while v12 capabilities are implemented and validated.
 
 ## Implemented
 
 ### 12.0.0-dev.1 foundation
-
-- Typed framework-independent domain objects for shows, episodes, episode states, quality profiles, and download candidates.
-- Deterministic candidate scoring with quality acceptance, preferred quality ranking, required words, rejected words, seeders, and score adjustments.
-- Read-only legacy SQLite migration exporter.
-- Optional legacy INI configuration capture.
-- Migration manifest counts, warnings, unknown-table reporting, and SQLite schema version capture.
-- CLI migration snapshot tool.
-- Regression tests for scoring, episode tracking, and legacy-row preservation.
-- v12 architecture/capability roadmap and migration workflow documentation.
+- Typed domain models for shows, episodes, episode states, quality profiles, and candidates.
+- Deterministic candidate scoring and read-only legacy migration snapshot tooling.
+- Initial migration, parity, architecture, and regression-test foundation.
 
 ### 12.0.0-dev.2 reliability and service layer
+- Typed provider/downloader contracts and normalized health diagnostics.
+- Explainable candidate decisions and time-bounded failed-release suppression.
+- Repository abstraction, in-memory reference storage, and library service.
 
-- Typed provider and downloader adapter contracts.
-- Standard adapter health model with healthy, degraded, unavailable, and unknown states.
-- Normalized provider search and downloader submission request/response contracts.
-- Explainable search-decision engine that records why each candidate was accepted, rejected, or suppressed.
-- Deterministic candidate selection with quality, word rules, seeders, and score adjustments.
-- Time-bounded failed-release suppression using stable fingerprints to prevent repeated bad grabs.
-- Repository abstraction for shows plus an in-memory reference implementation.
-- Library service for show listing, wanted-episode calculation, episode state updates, and bulk upsert.
-- Regression coverage for adapter health, search explanations, failed-release expiry, and paused-show queue behavior.
-- Architecture, parity, release-note, and capability documentation updated to match the implementation.
+### 12.0.0-dev.3 persistent runtime and orchestration
+- Native SQLite v12 show repository with explicit schema ownership and typed round-trip serialization.
+- Legacy/provider callable wrappers behind stable v12 adapter contracts.
+- Search orchestrator with provider health gating, fan-out, candidate aggregation, deterministic selection, optional automatic submission, and decision journaling.
+- Queue/activity model with progress/state reconciliation, unknown-client recovery, bounded history, and manual removal tracking.
+- Regression tests for persistence, automatic search/submission, and queue recovery.
 
 ## Next code milestones
 
-- Full legacy schema/config mapping and migration validation report.
-- SQLite-backed compatibility repository around current SickChill data with transactional writes isolated behind the repository contract.
-- Concrete provider adapters and downloader adapters with capability metadata, health checks, retry/backoff, and rate limiting.
-- Search orchestration service with provider fan-out, deduplication, diagnostics, and persisted decision history.
-- Queue/history services with failed-download recovery and manual intervention controls.
-- Versioned service API for library, episodes, search, queue, history, configuration, and diagnostics.
-- Modern responsive web interface developed exclusively against the service API.
-- Cutover, rollback, backup, and parity regression tooling.
+- Complete SickChill legacy schema/config mapping into native v12 storage with reconciliation reports.
+- Persist search decisions, queue state, failed-release history, jobs, and events across restarts.
+- Concrete Newznab/Torznab and torrent/NZB downloader adapters with retry/backoff and capability discovery.
+- Versioned service API for library, episodes, search, queue, history, configuration, jobs, and diagnostics.
+- Background scheduler/job engine with restart recovery, concurrency limits, and observable progress.
+- Modern responsive web interface developed exclusively against the v12 service API.
+- Cutover, rollback, backup, and full parity regression tooling.
 
-The legacy application remains the operational baseline until parity checks demonstrate that v12 can replace it safely.
+The legacy application remains the operational baseline until parity and migration validation demonstrate that v12 can replace it safely.
