@@ -7,14 +7,14 @@ TV Manager v12 is evolving toward a layered architecture that separates core dec
 - **Domain** — shows, episodes, monitoring, quality, release traits, scoring, policies.
 - **Application services** — library, search, queue, post-processing, migration, history, diagnostics, settings.
 - **Adapters** — indexers, search providers, download clients, metadata/artwork, subtitles, notifications, filesystem.
-- **Persistence** — legacy compatibility during transition plus an explicitly-owned native v12 SQLite schema.
-- **Jobs/events** — observable restart-safe background work and durable activity/history.
+- **Persistence** — legacy compatibility during transition plus explicitly-owned native v12 SQLite schemas.
+- **Jobs/events** — observable restart-safe background work, durable queue/search history, and crash-safe job leases.
 - **API** — versioned service endpoints; UI never reaches directly into databases or legacy globals.
 - **Web UI** — responsive client focused on library state, exceptions, queue/activity, search decisions, diagnostics, and configuration.
 
 ## Transition strategy
 
-The current SickChill runtime remains intact while v12 services are introduced beside it. The native v12 repository is intentionally stored separately from the legacy SickChill database. Compatibility wrappers can translate existing functions into stable v12 contracts without forcing a flag-day rewrite.
+The current SickChill runtime remains intact while v12 services are introduced beside it. Native v12 persistence is intentionally stored separately from the legacy SickChill database. Compatibility wrappers translate existing functions into stable v12 contracts without forcing a flag-day rewrite.
 
 ## Current service/runtime boundaries
 
@@ -22,13 +22,22 @@ The current SickChill runtime remains intact while v12 services are introduced b
 Owns show/episode inventory, monitoring state, wanted calculation, and repository-backed state updates.
 
 ### SearchOrchestrator
-Owns provider health gating, fan-out, isolated provider errors, candidate aggregation, explainable ranking, failed-release suppression, optional automatic downloader submission, and decision journaling.
+Owns provider health gating, fan-out, isolated provider errors, candidate aggregation, explainable ranking, failed-release suppression, optional automatic downloader submission, decision journaling, persistent search recording, and queue creation after successful submission.
+
+### Provider adapters
+`NewznabProviderAdapter` and `TorznabProviderAdapter` now provide concrete protocol foundations. They call standard capabilities and TV-search endpoints, normalize RSS/Newznab attributes, and return framework-independent `DownloadCandidate` objects that retain the provider download URL and GUID.
 
 ### Download adapters
-Own downloader health, normalized submission acknowledgement, external client IDs, and delete capability.
+`SABnzbdAdapter` and `QBittorrentAdapter` provide concrete health, submit, category/pause, and delete foundations behind the stable downloader protocol. Credentials are constructor/config inputs and are not included in runtime search/history payloads.
 
-### ActivityStore
-Owns normalized queue state, progress reconciliation, unknown-client recovery, bounded activity history, and removal events. The dev.3 implementation is in-process; durable persistence is the next step.
+### PersistentActivityStore / SQLiteRuntimeStore
+Own durable queue state, queue progress/state reconciliation, unknown-client recovery, structured event history, and persistent search-decision history. Queue state is reconstructed from SQLite at process startup rather than relying on process memory.
+
+### SQLiteJobStore / SchedulerEngine
+Own persistent schedules, due times, job enablement, run/failure accounting, crash-safe leases, and expired-lease recovery. A job must acquire its lease before running; a crashed worker cannot permanently strand the job because the lease expires.
+
+### TVManagerAPI
+Owns the versioned `/api/v1` service facade. The current dependency-free WSGI entry point exposes status, library, wanted episodes, queue, history, search history, jobs, due-job execution, and episode-status mutation. Optional bearer-token validation is available at the entry point.
 
 ### MigrationService
 Owns legacy inspection, mapping, preview, validation, import, cutover, and rollback metadata. It must never silently drop unknown legacy values.
@@ -40,24 +49,32 @@ Will aggregate database, filesystem, scheduler, metadata/indexer, provider, down
 
 Every result is normalized before scoring. A decision model includes or is designed to include normalized release identity, provider/protocol, show/episode identity, quality/source traits, seeders, word-rule matches, quality acceptance/rank, failed history, health context, adjustments, final score, and explicit reason records.
 
-The orchestration layer records a complete run: timestamps, show/episode keys, query, per-provider results/errors/skips, final decision, submission state, client ID, and downloader response text.
+The orchestration layer records a complete run: timestamps, show/episode keys, query, per-provider results/errors/skips, final decision, submission state, client ID, and downloader response text. In dev.4 that record can be persisted in the v12 runtime database for API/UI inspection after restart.
 
 ## Persistence design
 
-Native v12 persistence must have explicit schema ownership and migrations. Legacy data is an import/compatibility source, not the long-term schema contract. Durable state should eventually include:
+Native v12 persistence has explicit schema ownership. Legacy data is an import/compatibility source, not the long-term schema contract. Current durable state includes show/episode inventory in the native repository plus queue state, structured event history, search decisions, and scheduler metadata in the runtime store.
 
-- shows, episodes, monitoring and quality assignments
-- search decisions and provider execution results
+Still to be persisted or expanded:
+
 - failed-release suppression history
-- queue/download reconciliation state
-- processing journals
-- scheduler jobs, attempts, retries and errors
-- structured history/events
+- provider/downloader health samples and circuit-breaker state
+- completed-download processing journals
+- richer scheduler attempts, progress, cancellation and worker identity
 - migration manifests and reconciliation results
+- configuration metadata with secret references rather than plaintext secret history
 
 ## Operational design
 
-Background work will be represented as observable jobs with IDs, state, timestamps, progress, retries, and errors. Provider/downloader failures use bounded failure containment and will gain retry/backoff/circuit-breaking policies. Restart recovery must reconstruct active queue/job state rather than relying on process memory.
+Background work is moving to observable, restart-safe jobs. Job leases prevent duplicate execution and recover after crashes. Provider/downloader failures are contained at adapter boundaries and will gain bounded retry/backoff and circuit-breaking policies. Queue/job recovery must reconstruct state from durable storage and reconcile it with external clients instead of assuming process memory is authoritative.
+
+## API design rules
+
+- `/api/v1` is the first stable transport boundary; future web clients should depend on API/service contracts rather than legacy templates or globals.
+- API serialization is explicit and JSON-safe for dataclasses, enums, dates and datetimes.
+- State-changing operations go through application services/repositories.
+- Authentication is optional for local development but should be mandatory for exposed deployments.
+- Manual search, provider/client testing, settings, diagnostics, backup/restore and processing endpoints are the next expansion areas.
 
 ## UI design goals
 
