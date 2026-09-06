@@ -43,7 +43,13 @@ class _HTTPXMLProvider(ProviderAdapter):
         if self.api_key:
             query["apikey"] = self.api_key
         url = self.base_url.rstrip("/") + "/api?" + urllib.parse.urlencode(query)
-        request = urllib.request.Request(url, headers={"User-Agent": self.user_agent, "Accept": "application/rss+xml, application/xml, text/xml"})
+        request = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": self.user_agent,
+                "Accept": "application/rss+xml, application/xml, text/xml",
+            },
+        )
         started = time.perf_counter()
         response = self.opener(request, timeout=self.timeout)
         try:
@@ -58,11 +64,25 @@ class _HTTPXMLProvider(ProviderAdapter):
         try:
             payload, latency = self._request({"t": "caps"})
             if not payload:
-                return AdapterHealth.now(self.name, HealthState.DEGRADED, latency_ms=latency, message="Provider returned an empty capabilities document.")
+                return AdapterHealth.now(
+                    self.name,
+                    HealthState.DEGRADED,
+                    latency_ms=latency,
+                    message="Provider returned an empty capabilities document.",
+                )
             ET.fromstring(payload)
-            return AdapterHealth.now(self.name, HealthState.HEALTHY, latency_ms=latency, message="Capabilities endpoint responded successfully.")
+            return AdapterHealth.now(
+                self.name,
+                HealthState.HEALTHY,
+                latency_ms=latency,
+                message="Capabilities endpoint responded successfully.",
+            )
         except Exception as exc:
-            return AdapterHealth.now(self.name, HealthState.UNAVAILABLE, message=f"{type(exc).__name__}: {exc}")
+            return AdapterHealth.now(
+                self.name,
+                HealthState.UNAVAILABLE,
+                message=f"{type(exc).__name__}: {exc}",
+            )
 
     @staticmethod
     def _attr(item: ET.Element, name: str) -> str | None:
@@ -72,11 +92,18 @@ class _HTTPXMLProvider(ProviderAdapter):
         return None
 
     @classmethod
-    def _candidate(cls, item: ET.Element, *, provider: str, protocol: str) -> DownloadCandidate | None:
+    def _candidate(
+        cls,
+        item: ET.Element,
+        *,
+        provider: str,
+        protocol: str,
+    ) -> DownloadCandidate | None:
         title = (item.findtext("title") or "").strip()
         link = (item.findtext("link") or "").strip()
         if not title or not link:
             return None
+        guid = (item.findtext("guid") or "").strip() or None
         size_raw = cls._attr(item, "size") or item.findtext("size")
         seeders_raw = cls._attr(item, "seeders")
         try:
@@ -95,6 +122,8 @@ class _HTTPXMLProvider(ProviderAdapter):
             seeders=seeders,
             protocol=protocol,
             score_adjustment=0,
+            download_url=link,
+            guid=guid,
         )
 
 
