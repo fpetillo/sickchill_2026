@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass
 from datetime import date, datetime
+from enum import Enum
 from http import HTTPStatus
 from typing import Any, Callable, Iterable
 from urllib.parse import parse_qs
@@ -16,7 +17,7 @@ from .service import LibraryService
 def _jsonable(value: Any) -> Any:
     if isinstance(value, (datetime, date)):
         return value.isoformat()
-    if hasattr(value, "value") and value.__class__.__module__ == "enum":
+    if isinstance(value, Enum):
         return value.value
     if isinstance(value, dict):
         return {str(key): _jsonable(item) for key, item in value.items()}
