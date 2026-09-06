@@ -266,3 +266,82 @@ class SQLiteRuntimeStore:
     def initialize_queue(self, items: Iterable[QueueItem]) -> None:
         for item in items:
             self.save_queue_item(item)
+
+
+class PersistentActivityStore:
+    """ActivityStore-compatible facade that survives process restarts."""
+
+    def __init__(self, store: SQLiteRuntimeStore, *, max_history: int = 5000) -> None:
+        self.store = store
+        self.max_history = max_history
+        self.queue: dict[str, QueueItem] = {item.client_id: item for item in store.load_queue()}
+
+    @property
+    def history(self) -> list[HistoryEvent]:
+        return list(reversed(self.store.recent_history(self.max_history)))
+
+    def add(self, item: QueueItem) -> None:
+        self.queue[item.client_id] = item
+        self.store.save_queue_item(item)
+        self.record("queued", f"Queued {item.title}", client_id=item.client_id)
+
+    def reconcile(
+        self,
+        client_id: str,
+        state: QueueState,
+        *,
+        progress: float | None = None,
+        message: str = "",
+    ) -> QueueItem:
+        item = self.queue.get(client_id)
+        if item is None:
+            item = QueueItem(
+                client_id=client_id,
+                title=client_id,
+                downloader="unknown",
+                state=QueueState.UNKNOWN,
+            )
+            self.queue[client_id] = item
+        item.update(state, progress=progress, message=message)
+        self.store.save_queue_item(item)
+        self.record(
+            "queue-state",
+            f"{client_id} -> {state.value}: {message}".rstrip(),
+            client_id=client_id,
+        )
+        return item
+
+    def remove(self, client_id: str, *, message: str = "") -> bool:
+        item = self.queue.pop(client_id, None)
+        if item is None:
+            return False
+        self.store.delete_queue_item(client_id)
+        self.record("removed", message or f"Removed {item.title}", client_id=client_id)
+        return True
+
+    def record(
+        self,
+        kind: str,
+        message: str,
+        *,
+        client_id: str | None = None,
+        show_key: str | None = None,
+        episode_key: str | None = None,
+    ) -> None:
+        self.store.record_history(
+            HistoryEvent(
+                kind=kind,
+                timestamp=datetime.now(timezone.utc),
+                message=message,
+                client_id=client_id,
+                show_key=show_key,
+                episode_key=episode_key,
+            )
+        )
+        self.store.prune_history(self.max_history)
+
+    def active(self) -> list[QueueItem]:
+        return sorted(self.queue.values(), key=lambda item: item.added_at)
+
+    def recent_history(self, limit: int = 100) -> list[HistoryEvent]:
+        return self.store.recent_history(limit)
