@@ -7,64 +7,62 @@ TV Manager v12 is evolving toward a layered architecture that separates core dec
 - **Domain** — shows, episodes, monitoring, quality, release traits, scoring, policies.
 - **Application services** — library, search, queue, post-processing, migration, history, diagnostics, settings.
 - **Adapters** — indexers, search providers, download clients, metadata/artwork, subtitles, notifications, filesystem.
-- **Persistence** — legacy compatibility repositories during transition, followed by explicit v12 persistence models/migrations.
-- **API** — versioned service endpoints and events; UI never reaches directly into database or legacy globals.
+- **Persistence** — legacy compatibility during transition plus an explicitly-owned native v12 SQLite schema.
+- **Jobs/events** — observable restart-safe background work and durable activity/history.
+- **API** — versioned service endpoints; UI never reaches directly into databases or legacy globals.
 - **Web UI** — responsive client focused on library state, exceptions, queue/activity, search decisions, diagnostics, and configuration.
 
 ## Transition strategy
 
-The current SickChill runtime remains intact while v12 services are introduced beside it. New code should avoid depending on global runtime state whenever possible. Compatibility adapters can translate legacy objects/configuration into v12 domain objects until native v12 persistence is ready.
+The current SickChill runtime remains intact while v12 services are introduced beside it. The native v12 repository is intentionally stored separately from the legacy SickChill database. Compatibility wrappers can translate existing functions into stable v12 contracts without forcing a flag-day rewrite.
 
-## Service boundaries
+## Current service/runtime boundaries
 
 ### LibraryService
-Owns show/episode inventory, monitoring state, root folders, scans, imports, moves, metadata refresh, and repair operations. The first repository contract and in-memory reference service are now implemented.
+Owns show/episode inventory, monitoring state, wanted calculation, and repository-backed state updates.
 
-### SearchService
-Owns recent/backlog/manual search orchestration, provider capability filtering, candidate normalization, scoring, rejection reasons, deduplication, failed-history checks, and dispatch decisions. v12 now has first-class candidate decision/reason models and failed-release suppression primitives.
+### SearchOrchestrator
+Owns provider health gating, fan-out, isolated provider errors, candidate aggregation, explainable ranking, failed-release suppression, optional automatic downloader submission, and decision journaling.
 
-### DownloadService
-Owns downloader capabilities, connection tests, queue submission, status mapping, category/label handling, and download reconciliation. Typed downloader request/submission contracts now define the integration boundary.
+### Download adapters
+Own downloader health, normalized submission acknowledgement, external client IDs, and delete capability.
 
-### ProcessingService
-Owns completed-download matching, rename/move/copy/hardlink planning, subtitle and metadata sidecars, idempotency, operation journaling, and repair/reprocess actions.
+### ActivityStore
+Owns normalized queue state, progress reconciliation, unknown-client recovery, bounded activity history, and removal events. The dev.3 implementation is in-process; durable persistence is the next step.
 
 ### MigrationService
 Owns legacy inspection, mapping, preview, validation, import, cutover, and rollback metadata. It must never silently drop unknown legacy values.
 
-### DiagnosticsService
-Owns health/readiness state for database, filesystem, scheduler, metadata/indexers, providers, download clients, background jobs, and migration blockers. v12 adapters now share a normalized health state and latency/diagnostic model.
+### DiagnosticsService target
+Will aggregate database, filesystem, scheduler, metadata/indexer, provider, downloader, background-job, migration, and recovery health into one API/UI model.
 
-## Search decision pipeline
+## Search decision model
 
-Search should be observable end to end:
+Every result is normalized before scoring. A decision model includes or is designed to include normalized release identity, provider/protocol, show/episode identity, quality/source traits, seeders, word-rule matches, quality acceptance/rank, failed history, health context, adjustments, final score, and explicit reason records.
 
-1. Create a normalized request for a show/episode.
-2. Fan out only to eligible providers.
-3. Normalize candidate releases.
-4. Deduplicate equivalent releases.
-5. Apply required/rejected word policies.
-6. Apply quality-profile acceptance/ranking.
-7. Suppress known failed release fingerprints when policy requires it.
-8. Score accepted candidates using deterministic components.
-9. Persist all decisions and reasons, not only the winner.
-10. Submit the winning candidate through a compatible downloader adapter.
-11. Persist submission/queue/history state for diagnostics and recovery.
+The orchestration layer records a complete run: timestamps, show/episode keys, query, per-provider results/errors/skips, final decision, submission state, client ID, and downloader response text.
 
-Every decision record should eventually include normalized release name, provider/protocol, parsed episode identity, quality/source/codec traits, size/age/seeders, word-rule matches, quality rank, duplicate/failed state, provider health/rate-limit context, overrides, score, and reason list.
+## Persistence design
+
+Native v12 persistence must have explicit schema ownership and migrations. Legacy data is an import/compatibility source, not the long-term schema contract. Durable state should eventually include:
+
+- shows, episodes, monitoring and quality assignments
+- search decisions and provider execution results
+- failed-release suppression history
+- queue/download reconciliation state
+- processing journals
+- scheduler jobs, attempts, retries and errors
+- structured history/events
+- migration manifests and reconciliation results
 
 ## Operational design
 
-Background work should be represented as observable jobs with IDs, state, timestamps, progress, retries, and errors. Long-running work should not be hidden behind web requests. Provider and downloader failures should use bounded retry/backoff, and repeated failures should surface as health problems rather than silently consuming scheduler cycles.
+Background work will be represented as observable jobs with IDs, state, timestamps, progress, retries, and errors. Provider/downloader failures use bounded failure containment and will gain retry/backoff/circuit-breaking policies. Restart recovery must reconstruct active queue/job state rather than relying on process memory.
 
 ## UI design goals
 
-The modern interface should make exceptions and next actions obvious. Primary navigation should center on Dashboard, Library, Wanted/Search, Queue/Activity, Calendar, History, Diagnostics, and Settings. Settings should be grouped by user intent rather than legacy code organization. Manual search should show candidate score components and rejection/suppression reasons directly.
-
-## Current architecture checkpoint
-
-Version **12.0.0-dev.2** now includes typed domain models, read-only migration snapshots, provider/downloader adapter contracts, normalized health state, explainable search decisions, failed-release suppression, a repository abstraction, and the first library service. The next increment is persistent compatibility storage plus concrete orchestration and API boundaries.
+Primary navigation should center on Dashboard, Library, Wanted/Search, Queue/Activity, Calendar, History, Diagnostics, and Settings. Settings are grouped by user intent (library, search, downloads, processing, metadata, subtitles, notifications, integrations, system) rather than legacy code organization.
 
 ## Compatibility rule
 
-Until v12 reaches parity, legacy and v12 code may coexist, but v12 logic should be independently testable and should never require the legacy template layer to make core decisions.
+Until v12 reaches parity, legacy and v12 code may coexist, but v12 logic must remain independently testable and must never require the legacy template layer to make core decisions.
