@@ -101,6 +101,8 @@ class DownloadCandidate:
     seeders: int | None = None
     protocol: str = "unknown"
     score_adjustment: int = 0
+    download_url: str | None = None
+    guid: str | None = None
 
     def score(self, profile: QualityProfile, required_words: Iterable[str] = (), rejected_words: Iterable[str] = ()) -> int:
         haystack = self.title.casefold()
