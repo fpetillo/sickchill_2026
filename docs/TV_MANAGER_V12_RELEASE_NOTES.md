@@ -1,5 +1,27 @@
 # TV Manager v12 — Development Release Notes
 
+## 12.0.0-dev.3
+
+This increment adds the first persistent runtime path and operational search orchestration.
+
+### Added
+
+- Native SQLite-backed v12 show repository with explicit schema ownership and typed serialization of shows and episodes.
+- Compatibility wrappers for legacy/provider callables behind stable provider/downloader adapter contracts.
+- Search orchestration with provider health checks, provider fan-out, candidate aggregation, deterministic decision selection, optional automatic downloader submission, and an in-process decision journal.
+- Queue/activity state model with progress reconciliation, unknown-client recovery, bounded history, and explicit removal events.
+- Regression tests covering persistent repository round-trip behavior, automatic search/submission, and queue recovery.
+
+### Safety and migration
+
+- The new SQLite repository is separate from the legacy SickChill database; dev.3 does not mutate legacy tables.
+- Legacy integrations can be introduced through compatibility wrappers while v12 service contracts remain stable.
+- Search provider failures are contained at adapter/orchestration boundaries so one unhealthy source does not terminate a complete search run.
+
+### Next
+
+Persist jobs/search history/queue state, complete legacy schema reconciliation into native v12 storage, add concrete Newznab/Torznab and downloader adapters, expose the runtime through a versioned API, and introduce restart-safe background scheduling.
+
 ## 12.0.0-dev.2
 
 This increment moves v12 from domain/migration primitives into the first reliability and service layer needed for a modern TV automation platform.
@@ -15,10 +37,6 @@ This increment moves v12 from domain/migration primitives into the first reliabi
 - Show repository protocol and in-memory reference implementation.
 - Library service for show listing, wanted-episode queue generation, episode-state updates, and bulk upsert.
 - Regression tests covering search explanations, suppression expiry, paused-show queue behavior, and adapter health timestamps.
-
-### Direction
-
-The next increment will connect these contracts to persistent SickChill-compatible storage and concrete provider/downloader implementations, then expose them through a versioned service API. Search diagnostics and decision history will remain first-class features so the UI can explain not only what was selected, but why alternatives were rejected.
 
 ## 12.0.0-dev.1
 
